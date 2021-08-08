@@ -1,5 +1,5 @@
 """
-Simpler API for interacting our drones
+Simpler API for interacting with our drones
 
 """
 import olympe

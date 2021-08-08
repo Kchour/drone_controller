@@ -15,7 +15,8 @@ DRONE1_IP = "10.202.0.1"
 hidrone1 = HiDrone(DRONE1_IP)
 vs1 = VideoStreaming(hidrone1.drone)
 
-wps1 = [(48.878922,2.367782, 1), (48.878932,2.367982, 1), (48.879000,2.367992, 1)]
+# [lat, lon, altitude[m] ]
+wps1 = [(48.878922,2.367782, 1), (48.878932,2.367982, 1), (48.879000,2.367992, 1)] 
 
 # start video recording on drone 1 
 vs1.start()

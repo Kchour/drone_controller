@@ -13,7 +13,7 @@ First install [parrot-sphinx](https://developer.parrot.com/docs/sphinx/) and [pa
 
 Start firmware daemon.
 
-`$ sudo systemctl start firmwared"`
+`$ sudo systemctl start firmwared.service"`
 
 Start olympe virtual environment.
 
@@ -25,11 +25,11 @@ Export models path to GAZEBO_MODEL_PATH.
 
 Start Sphinx simulator with a specific drone (replace xxx).
 
-`$ sphinx drone_control/drones/xxx.drone`
+`$ sphinx drones/xxx.drone`
 
 Also, you can also set simulation parameters at run-time
 
-`$ sphinx drone_control/drones/xxx.drone::stolen_interface=::simple_front_cam=true drone_control/worlds/rellis_campus.world`
+`$ sphinx drones/anafi4k.drone::stolen_interface=::simple_front_cam=true worlds/rellis_campus.world`
 
 # Terminal 2
 
