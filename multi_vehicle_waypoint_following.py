@@ -1,8 +1,11 @@
 """
-Attempt to do (async) waypoint following assuming a small area
-and away from the earth's poles. 
+This demo script consists of 2 drones. They will take-off, follow some waypoints, and land. 
+Additionally, drone1 will use its camera to record.
 
-Linear interpolation is used between waypoints
+run this first: `sphinx drones/anafi4k.drone drones/anafi4k.drone::name="blah"::pose="5 0 0.2 0 0 0" worlds/rellis_campus.world`
+
+This script will also make use of the ThreadHandler in the drone module
+
 """
 
 from drone import HiDrone, Util
