@@ -1,5 +1,5 @@
 # Overview 
-Some higher level API implementation for using olympe
+Some higher level API implementation wrapper for Olympe
 
 ## Getting Started
 
@@ -33,12 +33,24 @@ source environmental variables before running any of the scripts
 
 ## Multi-drone simulation
 
-Simply pass two `.drone` files to sphinx, but each drone must have a unique name, and different starting pose!
-
+Simply pass two `.drone` files to sphinx, but each drone must have a unique name and different starting pose!
+e.g.
 `sphinx /opt/parrot-sphinx/usr/share/sphinx/drones/bebop2.drone /opt/parrot-sphinx/usr/share/sphinx/drones/bebop2.drone::name=other::stolen_interface=`
 
+Follow all the steps in the previous section except for what you will pass to sphinx:
 `sphinx drones/anafi4k.drone drones/anafi4k.drone::name="blah"::pose="5 0 0.2 0 0 0" worlds/rellis_campus.world`
 
 If using ethernet interface, the default address for the first drone is 10.202.0.1 (then 10.202.1.1 for the second drone, …).
 
-Use `fdc list instances` to see simulated instances. More info at [https://developer.parrot.com/docs/sphinx/firmwared.html](https://developer.parrot.com/docs/sphinx/firmwared.html)
+Verify using `fdc list instances` to see simulated instances. More info at [https://developer.parrot.com/docs/sphinx/firmwared.html](https://developer.parrot.com/docs/sphinx/firmwared.html)
+
+Now trying running `multi_waypoint_following.py` in terminal 2
+
+## Misc
+
+- Reset the gazebo simulator often when testing  via CTRL+R
+
+## Issues
+
+- VideoStream will have `olympe.pdraw.ANAFI-0000000 - _unregister_future - Failed to unregister future`. Seems like an issue with the latest version of olympe?
+- How to send mavlink files to the drone?
