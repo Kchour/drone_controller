@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Obtained from /opt/parrot-sphinx/usr/share/sphinx/drones -->
+<!-- With additional parameters from online site -->
+<drone
+  name="anafi4k"
+  firmware="http://plf.parrot.com/sphinx/firmwares/anafi/pc/latest/images/anafi-pc.ext2.zip"
+  hardware="anafi4k">
+  <machine_params
+    low_gpu="0"
+    with_front_cam="1"
+    simple_front_cam="1"
+    with_gimbal="1"
+    with_kalamos="0"
+    sdcard_serial="__undefined__"
+    product_pro="0"/>
+  <pose>default</pose>
+  <!--  -->
+  <!-- Simulate drone ethernet interface -->
+  <!-- make sure to replaced with actual eth interface name -->
+  <!--  -->
+  <!-- <interface>eth1</interface> -->
+  <interface>enp59s0</interface>
+
+  <!--  -->
+  <!-- 'wlan0' may need to be replaced the actual wifi interface name -->
+  <!-- This simulates the wifi interface on the drone -->
+  <!-- Comment to use only the ethernet interface, which has ip “10.202.0.1” -->
+  <!--  -->  
+  <!-- <stolen_interface>wlan0:enp59s0:192.168.42.1/24</stolen_interface> -->
+
+  <!--  -->
+  <!-- Additional parameters -->
+  <!--  -->
+  <!-- <wifi_channel>6</wifi_channel> -->
+  <!-- <stolen_bdaddr>00:00:00:00:00:00</stolen_bdaddr> -->
+  <!-- <fs_size>1G</fs_size> -->
+</drone>
