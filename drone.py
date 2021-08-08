@@ -44,7 +44,7 @@ class ThreadHandler(threading.Thread):
             print("joining", k)
             v.join()
         
-        # clear all threads are risk raising error, i.e.
+        # clear all threads or risk raising error, i.e.
         # All threads can only be started once!
         cls.instances = {}
 
@@ -82,7 +82,7 @@ class HiDrone:
         #     super().start()
 
         if name is None:
-            name = DRONE_IP
+            self.name = DRONE_IP
 
     def set_func(self, func, *args, **kwargs):
         """
