@@ -8,18 +8,21 @@ run this first: `$ sphinx drone_control/drones/xxx.drone::stolen_interface=::sim
 """
 
 from drone import HiDrone, Util
-from video_stream import VideoStreaming
+from video_stream import VideoStreamShow
 
+# create cv gui
+vss = VideoStreamShow()
 
+# connect to drone1 and add its stream to the gui
 DRONE1_IP = "10.202.0.1"
 hidrone1 = HiDrone(DRONE1_IP)
-vs1 = VideoStreaming(hidrone1.drone)
+vss.setup_drone(hidrone1)
 
 # [lat, lon, altitude[m] ]
 wps1 = [(48.878922,2.367782, 1), (48.878932,2.367982, 1), (48.879000,2.367992, 1)] 
 
 # start video recording on drone 1 
-vs1.start()
+vss.start_stream(hidrone1)
 
 # vehicle 1 take-off
 hidrone1.takeoff()
@@ -31,11 +34,13 @@ hidrone1.waypoint_following(wps1)
 hidrone1.land()
 
 # stop video recording on drone 1
-vs1.stop()
+vss.stop_stream(hidrone1)
 
 # postprocess
-vs1.postprocessing()
+vss.postprocessing(hidrone1)
 
 print("blah")
+
+hidrone1.disconnect()
 
 

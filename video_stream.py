@@ -3,7 +3,13 @@
 # NOTE: Line numbers of this example are referenced in the user guide.
 # Don't forget to update the user guide after every modification of this example.
 
+# As a rule of thumb, you want to keep any code that interacts with the 
+# GUI on the main thread (like imshow); consider using a Queue 
+# with the main thread pulling images from the queue to imshow and 
+# other threads pushing images into the queue
+
 import csv
+from drone import HiDrone
 import cv2
 import math
 import os
@@ -13,6 +19,8 @@ import subprocess
 import tempfile
 import threading
 import traceback
+
+import random
 
 import olympe
 from olympe.messages.ardrone3.Piloting import TakeOff, Landing
@@ -24,13 +32,18 @@ from olympe.messages.ardrone3.GPSSettingsState import GPSFixStateChanged
 
 olympe.log.update_config({"loggers": {"olympe": {"level": "WARNING"}}})
 
-DRONE_IP = "10.202.0.1"
+class VideoStream(threading.Thread):
+    """
+    Will take video frames from the drones and put the into a main-thread queue
 
-class VideoStreaming(threading.Thread):
+    """
 
-    def __init__(self, drone:olympe.Drone):
-        # Create the olympe.Drone object from its IP address
-        self.drone = drone
+    def __init__(self, hidrone:HiDrone):
+        
+        self.uuid = hidrone.name
+
+        self.drone = hidrone.drone
+
         self.tempd = tempfile.mkdtemp(prefix="olympe_streaming_test_")
         print("Olympe streaming example output dir: {}".format(self.tempd))
         self.h264_frame_stats = []
@@ -39,10 +52,9 @@ class VideoStreaming(threading.Thread):
         self.h264_stats_writer = csv.DictWriter(
             self.h264_stats_file, ['fps', 'bitrate'])
         self.h264_stats_writer.writeheader()
-        self.frame_queue = queue.Queue()
-        self.flush_queue_lock = threading.Lock()
+
         super().__init__()
-        super().start()
+        super().start() # start the run function (entry point)  #not sure if this is even needed due to callback functions
 
     def start(self):
         # # Connect the the drone
@@ -69,12 +81,6 @@ class VideoStreaming(threading.Thread):
         # Start video streaming
         self.drone.start_video_streaming()
 
-    def stop(self):
-        # Properly stop the video stream and disconnect
-        self.drone.stop_video_streaming()
-        self.drone.disconnect()
-        self.h264_stats_file.close()
-
     def yuv_frame_cb(self, yuv_frame):
         """
         This function will be called by Olympe for each decoded YUV frame.
@@ -82,12 +88,14 @@ class VideoStreaming(threading.Thread):
             :type yuv_frame: olympe.VideoFrame
         """
         yuv_frame.ref()
-        self.frame_queue.put_nowait(yuv_frame)
+        # put uuid to identify item of queue later
+        self.frame_queue.put_nowait((yuv_frame, self.uuid))
 
     def flush_cb(self):
         with self.flush_queue_lock:
             while not self.frame_queue.empty():
-                self.frame_queue.get_nowait().unref()
+                # access the frame not the uuid
+                self.frame_queue.get_nowait()[0].unref()
         return True
 
     def start_cb(self):
@@ -128,6 +136,59 @@ class VideoStreaming(threading.Thread):
             self.h264_stats_writer.writerow(
                 {'fps': h264_fps, 'bitrate': h264_bitrate})
 
+    def stop(self):
+        # Properly stop the video stream and disconnect
+        self.drone.stop_video_streaming()
+        # self.drone.disconnect()
+        self.h264_stats_file.close()
+    
+    def postprocessing(self):
+        # Convert the raw .264 file into an .mp4 file
+        h264_filepath = os.path.join(self.tempd, 'h264_data.264')
+        mp4_filepath = os.path.join(self.tempd, 'h264_data.mp4')
+        subprocess.run(
+            shlex.split('ffmpeg -i {} -c:v copy -y {}'.format(
+                h264_filepath, mp4_filepath)),
+            check=True
+        )
+
+class VideoStreamShow(threading.Thread):
+    """
+    Instantiate this one
+
+    """
+    # store videostream threads
+    drone_instances = {}
+    frame_queue = queue.Queue()
+    flush_queue_lock = threading.Lock()
+
+    @classmethod
+    def setup_drone(cls, hidrone:HiDrone):
+        
+        vs = VideoStream(hidrone)
+        vs.frame_queue = VideoStreamShow.frame_queue
+        vs.flush_queue_lock = VideoStreamShow.flush_queue_lock
+        cls.drone_instances[hidrone.name] = vs
+
+    @classmethod
+    def start_stream(cls, hidrone:HiDrone):
+        cls.drone_instances[hidrone.name].start()
+
+    @classmethod
+    def stop_stream(cls, hidrone:HiDrone):
+        cls.drone_instances[hidrone.name].stop()
+
+    @classmethod
+    def postprocessing(cls, hidrone:HiDrone):
+        cls.drone_instances[hidrone.name].postprocessing()
+
+    def __init__(self):
+
+        self.pulled_from_queue_once = False
+
+        super().__init__()
+        super().start() # start the run function (entry point) to imshow constantly    
+    
     def show_yuv_frame(self, window_name, yuv_frame):
         # the VideoFrame.info() dictionary contains some useful information
         # such as the video resolution
@@ -149,23 +210,30 @@ class VideoStreaming(threading.Thread):
         # Use OpenCV to convert the yuv frame to RGB
         cv2frame = cv2.cvtColor(yuv_frame.as_ndarray(), cv2_cvt_color_flag)
         # Use OpenCV to show this frame
+        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
         cv2.imshow(window_name, cv2frame)
         cv2.waitKey(1)  # please OpenCV for 1 ms...
 
     def run(self):
+        """
+        Pull crap from the queue and imshow it!
+        """
         window_name = "Olympe Streaming Example"
-        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+        # # make sure we only set the window on
+        # for k,v in VideoStreamShow.drone_instances.items():
+        #     cv2.namedWindow(window_name+str(k), cv2.WINDOW_NORMAL)
+        # get main thread
         main_thread = next(
             filter(lambda t: t.name == "MainThread", threading.enumerate())
         )
         while main_thread.is_alive():
             with self.flush_queue_lock:
                 try:
-                    yuv_frame = self.frame_queue.get(timeout=0.01)
+                    yuv_frame, uuid = self.frame_queue.get(timeout=0.01)
                 except queue.Empty:
                     continue
                 try:
-                    self.show_yuv_frame(window_name, yuv_frame)
+                    self.show_yuv_frame(window_name+str(uuid), yuv_frame)
                 except Exception:
                     # We have to continue popping frame from the queue even if
                     # we fail to show one frame
@@ -174,7 +242,8 @@ class VideoStreaming(threading.Thread):
                     # Don't forget to unref the yuv frame. We don't want to
                     # starve the video buffer pool
                     yuv_frame.unref()
-        cv2.destroyWindow(window_name)
+        # cv2.destroyWindow(window_name)
+        cv2.destroyAllWindows()
 
     def fly(self):
         # Takeoff, fly, land, ...
@@ -203,15 +272,7 @@ class VideoStreaming(threading.Thread):
         ).wait()
         print("Landed\n")
 
-    def postprocessing(self):
-        # Convert the raw .264 file into an .mp4 file
-        h264_filepath = os.path.join(self.tempd, 'h264_data.264')
-        mp4_filepath = os.path.join(self.tempd, 'h264_data.mp4')
-        subprocess.run(
-            shlex.split('ffmpeg -i {} -c:v copy -y {}'.format(
-                h264_filepath, mp4_filepath)),
-            check=True
-        )
+   
 
         # Replay this MP4 video file using the default video viewer (VLC?)
         # subprocess.run(
@@ -222,13 +283,13 @@ class VideoStreaming(threading.Thread):
 
 if __name__ == "__main__":
     print("blah")
-    # Not completely applicable. 
-    streaming_example = VideoStreaming(drone_obj)
-    # Start the video stream
-    streaming_example.start()
-    # Perform some live video processing while the drone is flying
-    streaming_example.fly()
-    # Stop the video stream
-    streaming_example.stop()
-    # Recorded video stream postprocessing
-    streaming_example.postprocessing()
+    # # Not completely applicable. 
+    # streaming_example = VideoStreaming(drone_obj)
+    # # Start the video stream
+    # streaming_example.start()
+    # # Perform some live video processing while the drone is flying
+    # streaming_example.fly()
+    # # Stop the video stream
+    # streaming_example.stop()
+    # # Recorded video stream postprocessing
+    # streaming_example.postprocessing()

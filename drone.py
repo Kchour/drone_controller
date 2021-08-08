@@ -66,6 +66,9 @@ class HiDrone:
 
     @staticmethod
     def start_and_join():
+        """
+        Execute functions
+        """
         ThreadHandler.start_and_join()
 
     def __init__(self, DRONE_IP, name=None):
