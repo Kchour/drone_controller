@@ -9,7 +9,7 @@
 # other threads pushing images into the queue
 
 import csv
-from drone import HiDrone
+from .drone_controller import HiDrone
 import cv2
 import math
 import os

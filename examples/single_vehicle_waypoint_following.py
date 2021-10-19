@@ -6,17 +6,17 @@ run this first: `$ sphinx drone_control/drones/xxx.drone::stolen_interface=::sim
 
 
 """
-
-from drone import HiDrone, Util
-from video_stream import VideoStreamShow
+from drone_controller import HiDrone, Util, VideoStreamShow
 
 # create cv gui
 vss = VideoStreamShow()
 
 # connect to drone1 and add its stream to the gui
+print("Connecting to drone 1...")
 DRONE1_IP = "10.202.0.1"
 hidrone1 = HiDrone(DRONE1_IP)
 vss.setup_drone(hidrone1)
+print("Conneced!")
 
 # [lat, lon, altitude[m] ]
 wps1 = [(48.878922,2.367782, 1), (48.878932,2.367982, 1), (48.879000,2.367992, 1)] 

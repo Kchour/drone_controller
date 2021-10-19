@@ -9,11 +9,19 @@ Some higher level wrapper for Olympe (only a few things implemented), an example
 
 First install [parrot-sphinx](https://developer.parrot.com/docs/sphinx/) and [parrot-olympe](https://developer.parrot.com/docs/olympe/).
 
+Then clone this repo somewhere say 
+`$ cd ~/tests`
+`$ git clone https://github.com/Kchour/drone_controller`
+
+Install this package in editable mode:
+`$ cd ~/tests/drone_controller`
+`$ python3 -m pip install -e .`
+
 # Terminal 1
 
 Start firmware daemon.
 
-`$ sudo systemctl start firmwared.service"`
+`$ sudo systemctl start firmwared.service`
 
 Start olympe virtual environment.
 

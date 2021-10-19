@@ -7,21 +7,24 @@ run this first: `sphinx drones/anafi4k.drone drones/anafi4k.drone::name="blah"::
 This script will also make use of the ThreadHandler in the drone module
 
 """
+from drone_controller import HiDrone, Util, VideoStreamShow
 
-from drone import HiDrone, Util
-from video_stream import VideoStreamShow
 
 # create cv gui instance
 vss = VideoStreamShow()
 
 # connect to drone1, add its stream to the gui and record
+print("Connecting to drone 1...")
 DRONE1_IP = "10.202.0.1"
 hidrone1 = HiDrone(DRONE1_IP)
 vss.setup_drone(hidrone1)
+print("Connected!")
 
+print("Connecting to drone 2...")
 DRONE2_IP = "10.202.1.1"
 hidrone2 = HiDrone(DRONE2_IP)
 vss.setup_drone(hidrone2)
+print("Connected!")
 
 # create some sample waypoints [lat, lon, alt[m] ]
 wps1 = [(48.878922,2.367782, 1), (48.878932,2.367982, 1), (48.879000,2.367992, 1)]
@@ -39,6 +42,7 @@ hidrone2.set_func(hidrone2.takeoff)
 HiDrone.start_and_join()
 
 # now perform waypoint following with both vehicles
+print("Performing waypoint following")
 hidrone1.set_func(hidrone1.waypoint_following, wps1)
 hidrone2.set_func(hidrone2.waypoint_following, wps2)
 
