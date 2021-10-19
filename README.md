@@ -1,5 +1,5 @@
 # Overview 
-Some higher level wrapper for Olympe (only a few things implemented), an example world, and a multi-vehicle simulation demo (via threading)
+This repo contains a simple, high level wrapper for Olympe (only a few things implemented), that utlizes threading to do multi-drone control. An example world and a multi-vehicle simulation demo is included.
 ![Screenshot from 2021-08-08 02-14-10](https://user-images.githubusercontent.com/21199708/128624401-812ba564-a14a-47d8-8a1f-224a3def077c.png)
 
 ![Screenshot from 2021-08-08 02-15-52](https://user-images.githubusercontent.com/21199708/128624406-8e4f36a2-fbd3-405b-8dcf-8d5aca879603.png)
@@ -10,12 +10,18 @@ Some higher level wrapper for Olympe (only a few things implemented), an example
 First install [parrot-sphinx](https://developer.parrot.com/docs/sphinx/) and [parrot-olympe](https://developer.parrot.com/docs/olympe/).
 
 Then clone this repo somewhere say 
-`$ cd ~/tests`
-`$ git clone https://github.com/Kchour/drone_controller`
+
+```
+$ cd ~/tests
+$ git clone https://github.com/Kchour/drone_controller
+```
 
 Install this package in editable mode:
-`$ cd ~/tests/drone_controller`
-`$ python3 -m pip install -e .`
+
+```
+$ cd ~/tests/drone_controller
+$ python3 -m pip install -e .
+```
 
 # Terminal 1
 
