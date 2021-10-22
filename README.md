@@ -16,11 +16,11 @@ $ cd ~/tests
 $ git clone https://github.com/Kchour/drone_controller
 ```
 
-Install this package in editable mode:
+After starting the olympe virtual environment, install this package in editable mode:
 
 ```
-$ cd ~/tests/drone_controller
-$ python3 -m pip install -e .
+(olympe venv) $ cd ~/tests/drone_controller
+(olympe venv) $ python3 -m pip install -e .
 ```
 
 # Terminal 1
