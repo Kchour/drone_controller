@@ -1,2 +1,3 @@
-from .drone_controller import HiDrone, Util
+from .drone_thread import HiDrone, Util
 from .video_stream import VideoStreamShow
+from .flight_plan import automission

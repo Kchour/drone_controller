@@ -11,6 +11,7 @@ from olympe.messages.common.MavlinkState import (
     MissionItemExecuted,
 )
 
+from drone_controller import automission
 import requests
 import os
 
@@ -26,22 +27,44 @@ headers = {
 drone = olympe.Drone(drone_ip)
 drone.connect()
 
-# Upload mavlink file
-with open("test.mavlink", "rb") as data:
-    resp = requests.put(
-        url=os.path.join("http://", drone_ip, "api/v1/upload", "flightplan"),
-        headers=headers,
-        data=data,
-    )
+# # Upload mavlink file
+# with open("test.mavlink", "rb") as data:
+#     resp = requests.put(
+#         url=os.path.join("http://", drone_ip, "api/v1/upload", "flightplan"),
+#         headers=headers,
+#         data=data,
+#     )
 
-# Start flightplan
-expectation = drone(
-    Start(resp.json(), type="flightPlan")
-    >> MissionItemExecuted(idx=0.0)
-    >> MissionItemExecuted(idx=1.0)
-    >> MissionItemExecuted(idx=2.0)
-    >> MissionItemExecuted(idx=3.0)
-    >> MavlinkFilePlayingStateChanged(state="stopped")
-).wait(_timeout=200)
+# try sending string 
+my_mission = automission("copter")
+my_mission.takeoff(15)
+my_mission.waypoint(48.879000, 2.366549, 105.0)
+my_mission.waypoint(48.879139, 2.367296, 10.0)
+my_mission.land(48.879139, 2.367296, 0)
+# Upload mavlink file
+resp = requests.put(
+    url=os.path.join("http://", drone_ip, "api/v1/upload", "flightplan"),
+    headers=headers,
+    data=my_mission.as_text().encode('ascii'),
+)
+
+
+# # Start flightplan
+# expectation = drone(
+#     Start(resp.json(), type="flightPlan")
+#     >> MissionItemExecuted(idx=0.0)
+#     >> MissionItemExecuted(idx=1.0)
+#     >> MissionItemExecuted(idx=2.0)
+#     >> MissionItemExecuted(idx=3.0)
+#     >> MavlinkFilePlayingStateChanged(state="stopped")
+# ).wait(_timeout=200)
+
+expectation = Start(resp.json(), type="flightPlan")
+for i in range(4):
+    expectation = expectation >> MissionItemExecuted(idx=i)
+
+expectation = expectation >> MavlinkFilePlayingStateChanged(state="stopped")
+
+drone(expectation).wait()
 
 assert expectation

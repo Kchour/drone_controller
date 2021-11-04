@@ -14,6 +14,7 @@ vss = VideoStreamShow()
 # connect to drone1 and add its stream to the gui
 print("Connecting to drone 1...")
 DRONE1_IP = "10.202.0.1"
+# DRONE1_IP = "10.202.1.1"
 hidrone1 = HiDrone(DRONE1_IP)
 vss.setup_drone(hidrone1)
 print("Conneced!")

@@ -82,18 +82,20 @@ class automission(object):
 		self.mlist=[] #each element of the array represents a command, ie waypoint, with its parameters
 		#these two lines are by default, exists every mission planner file
 		self.mlist.append('QGC WPL 120\n')
-		self.mlist.append('0	1	0	0	0	0	0	0	0	0	0	1\n')
+		# self.mlist.append('0	1	0	0	0	0	0	0	0	0	0	1\n')
 		
 		# increment counter for index
-		self.counter=1
+		self.counter=0
 
 	def write(self,name='test.mavlink'): 		
 		# saves final command list mlist as txt file. 
 		# Missionplanner can direcly open this text document in flight plan / load WP file button
 		with open(name, "w") as text_file:
-			text_file.write(str(self))
-        
-        print("Wrote mavlink flight plan to file")
+			text_file.write(str(self))        
+		print("Wrote mavlink flight plan to file")
+	
+	def as_text(self):
+		return str(self)
 
 	def __repr__(self):
 		expr = ""
@@ -110,19 +112,19 @@ class automission(object):
 		# self.param_to_mcommand(0,3,waypoint_id,delay,0,0,0,lat,lon,alt,1)
 		
 		msg = MavlinkMsg(INDEX=self.counter, CURRENT_WP=0, COORD_FRAME=3, COMMAND=Cmd.MAV_CMD_NAV_WAYPOINT.value,
-					PARAM1=delay, PARAM2=0, PARAM3=0, PARAM4=NAN, PARAM5=lat, PARAM6=lon, PARAM7=alt)
+					PARAM1=delay, PARAM2=0, PARAM3=0, PARAM4=0, PARAM5=lat, PARAM6=lon, PARAM7=alt)
 
 		self.mlist.append(msg)
 		self.counter += 1
 
-	def takeoff(self,alt, lat=0,lon=0, yaw=NAN):
+	def takeoff(self,alt, lat=0,lon=0, yaw=0):
 		# takeoff_id=22
 		# # Changed CURRENT_WP from 0 to 1
 		# self.param_to_mcommand(1,3,takeoff_id,angle,0,0,0,lat,lon,alt,1)
 		# # self.param_to_mcommand(0,3,takeoff_id,angle,0,0,0,lat,lon,alt,1)
 
-		msg = MavlinkMsg(INDEX=self.counter, CURRENT_WP=0, COORD_FRAME=3, COMMAND=Cmd.MAV_CMD_NAV_TAKEOFF.value,
-					PARAM1=0, PARAM2=0, PARAM3=0, PARAM4=yaw, PARAM5=lat, PARAM6=lon, PARAM7=alt)
+		msg = MavlinkMsg(INDEX=self.counter, CURRENT_WP=1, COORD_FRAME=3, COMMAND=Cmd.MAV_CMD_NAV_TAKEOFF.value,
+					PARAM1=0, PARAM2=0, PARAM3=0, PARAM4=0, PARAM5=lat, PARAM6=lon, PARAM7=alt)
 
 		self.mlist.append(msg)
 		self.counter += 1
@@ -132,7 +134,7 @@ class automission(object):
 		# self.param_to_mcommand(0,3,landid,0,0,0,0,lat,lon,alt,1)
 
 		msg = MavlinkMsg(INDEX=self.counter, CURRENT_WP=0, COORD_FRAME=3, COMMAND=Cmd.MAV_CMD_NAV_LAND.value,
-					PARAM1=0, PARAM2=0, PARAM3=0, PARAM4=NAN, PARAM5=lat, PARAM6=lon, PARAM7=alt)
+					PARAM1=0, PARAM2=0, PARAM3=0, PARAM4=0, PARAM5=lat, PARAM6=lon, PARAM7=alt)
 
 		self.mlist.append(msg)
 		self.counter += 1
@@ -226,7 +228,7 @@ if __name__ == "__main__":
 	print(test)
 
 	my_mission = automission("copter")
-	my_mission.takeoff(15, 48.878601, 2.366549)
+	my_mission.takeoff(15)
 	my_mission.waypoint(48.879000, 2.366549, 20.0)
 	my_mission.waypoint(48.879139, 2.367296, 10.0)
 	my_mission.land(48.879139, 2.367296, 0)

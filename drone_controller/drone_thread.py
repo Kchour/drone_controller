@@ -62,8 +62,25 @@ class ThreadHandler(threading.Thread):
         self.func(*self.args, **self.kwargs)
 
 
-class HiDrone:
+class StateThread(threading.Thread):
+    """Thread just for reporting vehicle state"""
+    def __init__(self, drone: HiDrone, state_deque):
+        self.drone = drone
+        # store returned values into dequeue
+        self.state_queue = state_deque
 
+class MavlinkThread(threading.Thread):
+    """Thread (queue) for transfering mavlink flightplan to drone"""
+
+    def __init__(self, drone: HiDrone, cmd_queue):
+        self.drone = drone
+
+    def run(self):
+
+
+
+class HiDrone:
+    """Allow user to start the above two threads each time this object is created"""
     @staticmethod
     def start_and_join():
         """
