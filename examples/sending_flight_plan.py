@@ -43,10 +43,10 @@ drone.connect()
 # try sending string 
 my_mission = automission("copter")
 # Take off command is ignored!
-my_mission.takeoff(0)
+my_mission.takeoff()
 my_mission.waypoint(48.879000, 2.366549, 100.0)
 my_mission.waypoint(48.879139, 2.367296, 10.0)
-my_mission.land(48.879139, 2.367296, 0)
+my_mission.land()
 # Upload mavlink file
 resp = requests.put(
     url=os.path.join("http://", drone_ip, "api/v1/upload", "flightplan"),
