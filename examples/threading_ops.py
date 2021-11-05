@@ -18,9 +18,10 @@ my_mission = automission("copter")
 # Take off command is ignored! wtf
 # Taking a picture
 my_mission.takeoff()
+my_mission.waypoint(48.878922, 2.367782, 1)
 my_mission.image_capture_mode(1,2)
 my_mission.start_take_picture(0, 15, 12)
-my_mission.waypoint(48.878922, 2.367782, 5)
+my_mission.waypoint(48.878922, 2.367782, 10)
 my_mission.waypoint(48.879000, 2.366549, 20.0)
 my_mission.waypoint(48.879139, 2.367296, 10.0)
 my_mission.stop_take_picture()
@@ -54,6 +55,5 @@ while time.time() - start_time < 2000:
     time.sleep(1)
     if hdrone.drone.get_state(FlyingStateChanged)["state"] is FlyingStateChanged_State.landed:
         # delay sending another flight plan
-        time.sleep(30) 
         print("sending flight plan")
         hdrone.send_flightplan(my_mission)

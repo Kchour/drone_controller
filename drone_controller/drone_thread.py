@@ -23,6 +23,7 @@ import time
 from collections import deque
 import requests
 import os
+from os.path import expanduser
 
 from .flight_plan import automission
 
@@ -101,8 +102,11 @@ class HiDrone:
             self.name = name
 
         # init thread objects
+        home = expanduser("~")
+        path = os.path.join(home, ".drone_data_recordings", self.name+".csv")
+
         self.state_deque = deque()
-        self.state_thread = StateThread(self, state_deque=self.state_deque)
+        self.state_thread = StateThread(self, state_deque=self.state_deque, path=path)
 
         self.cmd_deque = deque()
         self.cmd_thread = MavlinkThread(self, self.cmd_deque)
@@ -196,12 +200,15 @@ class HiDrone:
         Returns:
             an orderedDict (see below)
         """
-        posDict = self.drone.get_state(PositionChanged)
-        lat, lon, alt = posDict["latitude"], posDict["longitude"], posDict["altitude"]
+        try:
+            posDict = self.drone.get_state(PositionChanged)
+            lat, lon, alt = posDict["latitude"], posDict["longitude"], posDict["altitude"]
 
-        print("Latitude:", lat) 
-        print("Longitude:", lon) 
-        print("Altitude:", alt) 
+            print("Latitude:", lat) 
+            print("Longitude:", lon) 
+            print("Altitude:", alt) 
+        except:
+            posDict = {"latitude": -1, "longitude":-1, "altitude": -1}
 
         return posDict
 
@@ -213,7 +220,7 @@ class HiDrone:
         speedDict = self.drone.get_state(SpeedChanged)
 
         airspeed = np.linalg.norm([speedDict["speedX"], speedDict["speedY"], speedDict["speedZ"] ])
-        print(airspeed)
+        print("airspeed: {}".format(airspeed))
 
         return airspeed
 
@@ -266,7 +273,8 @@ class HiDrone:
             pass
         print("Drone {} @ {} STARTING COMMAND THREAD".format(self.name, self.drone_ip))
         self.cmd_thread.start()
-        # print("Drone {} @ {} STARTING COMMAND THREAD".format(self.name, self.drone_ip))
+        print("Drone {} @ {} STARTING STATE-RECORDING THREAD".format(self.name, self.drone_ip))
+        self.state_thread.start()
 
     def send_flightplan(self, cmd: automission):
         # only allow one flight plan in queue
@@ -277,14 +285,73 @@ class HiDrone:
 
 class StateThread(threading.Thread):
     """Thread just for reporting vehicle state"""
-    def __init__(self, drone: HiDrone, state_deque):
+    def __init__(self, drone: HiDrone, state_deque, path: str):
         self.drone = drone
         # store returned values into dequeue
         self.state_queue = state_deque
-        self.rate = 10
+        self.rate = 1
 
-    # def run(self):
+        self.path = self.unique_name(path)
+        super().__init__()
 
+    def unique_name(self, path):
+        filename, extension = os.path.splitext(path)
+        counter = 1
+
+        while os.path.exists(path):
+            path = filename + " (" + str(counter) + ")" + extension
+            counter += 1
+
+        # create file if it does not exist
+        if not os.path.exists(os.path.dirname(path)):
+            try:
+                os.makedirs(os.path.dirname(path)) 
+            except OSError as exc:
+                # guard against raise condition
+                raise
+            
+            # write a blank file there
+            with open(path, 'w') as f:
+                f.write("")
+
+        return path
+
+    def run(self):
+        self.prev_time = time.time()
+        start = time.time()
+     
+        with open(self.path, 'a') as file:
+            # Add titles
+            file.write("time, vgx, vgy, vgz, vb, lat, lon, alt, roll, pitch, yaw\n")
+            while True:
+                if self.drone.drone.get_state(FlyingStateChanged)["state"] is not FlyingStateChanged_State.landing or \
+                    self.drone.drone.get_state(FlyingStateChanged)["state"] is not FlyingStateChanged_State.landed:
+
+                    # make time series
+
+                    # get time
+                    # get global frame speed
+                    # get body frame speed
+                    # get pose (lat/lon/alt)
+                    # get attitude
+                    vgx, vgy, vgz = self.drone.get_global_speed().values()
+                    vb = self.drone.get_air_speed()
+                    lat, lon, alt = self.drone.get_pos().values()
+                    r, p, y = self.drone.get_attitude().values()
+
+                    # time, vgx, vgy, vgz, vb, lat, lon, alt, roll, pitch, yaw
+                    data = "{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}\n".format(time.time()-start, vgx, vgy, vgz, vb, lat, lon, alt, r, p, y)
+
+                    # write to file
+                    file.write(data)
+
+                    # control loop rate
+                    time_now = time.time()
+                    dt = time_now - self.prev_time
+                    if 1/self.rate - dt >0:
+                        time.sleep(1/self.rate - dt)
+
+                    self.prev_time = time_now
 
     
 from olympe.messages.common.Mavlink import Start
@@ -313,7 +380,6 @@ class MavlinkThread(threading.Thread):
         self.prev_time = time.time()
         while True:
             # get cmd
-            print("length of cmd deque: {}".format(len(self.cmd_deque)))
             if len(self.cmd_deque)>0:
                 with lock: 
                     cmd_data = self.cmd_deque.popleft()
