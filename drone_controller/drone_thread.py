@@ -10,13 +10,24 @@ from olympe.messages.ardrone3.GPSSettingsState import GPSFixStateChanged, HomeCh
 from olympe.enums.ardrone3.PilotingState import MoveToChanged_Orientation_mode, FlyingStateChanged_State
 
 # Limit the verbosity of log
-olympe.log.update_config({"loggers": {"olympe": {"level": "WARNING"}}})
+olympe.log.update_config({"loggers": {"olympe": {"level": "INFO"}}})
 
+from io import BytesIO
 import threading
+from threading import Lock
 import random
 import numpy as np
 # import utm
 from typing import List
+import time
+from collections import deque
+import requests
+import os
+
+from .flight_plan import automission
+
+lock = Lock()
+
 
 
 class ThreadHandler(threading.Thread):
@@ -61,24 +72,6 @@ class ThreadHandler(threading.Thread):
     def run(self):
         self.func(*self.args, **self.kwargs)
 
-
-class StateThread(threading.Thread):
-    """Thread just for reporting vehicle state"""
-    def __init__(self, drone: HiDrone, state_deque):
-        self.drone = drone
-        # store returned values into dequeue
-        self.state_queue = state_deque
-
-class MavlinkThread(threading.Thread):
-    """Thread (queue) for transfering mavlink flightplan to drone"""
-
-    def __init__(self, drone: HiDrone, cmd_queue):
-        self.drone = drone
-
-    def run(self):
-
-
-
 class HiDrone:
     """Allow user to start the above two threads each time this object is created"""
     @staticmethod
@@ -89,6 +82,7 @@ class HiDrone:
         ThreadHandler.start_and_join()
 
     def __init__(self, DRONE_IP, name=None):
+        self.drone_ip = DRONE_IP
         self.drone = olympe.Drone(DRONE_IP)
         self.drone.connect()
 
@@ -103,6 +97,15 @@ class HiDrone:
 
         if name is None:
             self.name = DRONE_IP
+        else:
+            self.name = name
+
+        # init thread objects
+        self.state_deque = deque()
+        self.state_thread = StateThread(self, state_deque=self.state_deque)
+
+        self.cmd_deque = deque()
+        self.cmd_thread = MavlinkThread(self, self.cmd_deque)
 
     def set_func(self, func, *args, **kwargs):
         """
@@ -253,31 +256,101 @@ class HiDrone:
             # self.hidrone.drone(moveTo(wp[0], wp[1], wp[2], MoveToChanged_Orientation_mode.NONE, 0.0))
             # hacky way to do this
             # blah += "moveTo({}, {}, {}, MoveToChanged_Orientation_mode.NONE, 0.0, _no_expect=True) >> FlyingStateChanged(state='flying', _timeout=5,  _no_expect=True) >> FlyingStateChanged(state='hovering', _timeout=5,  _no_expect=True) >> ".format(wp[0], wp[1], wp[2])
-            self.moveto(wp[0], wp[1], wp[2])     
+            self.moveto(wp[0], wp[1], wp[2])    
+
+    def setup(self):
+        """set up threads"""
+        # first wait for GPS STATE CHANGED
+        # while not self.drone.get_state(GPSFixStateChanged)[]
+        while self.drone.get_state(FlyingStateChanged)['state'] is not FlyingStateChanged_State.landed:
+            pass
+        print("Drone {} @ {} STARTING COMMAND THREAD".format(self.name, self.drone_ip))
+        self.cmd_thread.start()
+        # print("Drone {} @ {} STARTING COMMAND THREAD".format(self.name, self.drone_ip))
+
+    def send_flightplan(self, cmd: automission):
+        # only allow one flight plan in queue
+        if len(self.cmd_deque) == 0:
+            with lock:
+                self.cmd_deque.append(cmd)
+                print("main thread deque {}".format(len(self.cmd_deque)))
+
+class StateThread(threading.Thread):
+    """Thread just for reporting vehicle state"""
+    def __init__(self, drone: HiDrone, state_deque):
+        self.drone = drone
+        # store returned values into dequeue
+        self.state_queue = state_deque
+        self.rate = 10
+
+    # def run(self):
 
 
-class WaypointFollower(threading.Thread):
-    """ DEPRECATED
     
-    To use, simply instantiate and call start() and join()
+from olympe.messages.common.Mavlink import Start
+from olympe.messages.common.MavlinkState import  (
+    MavlinkFilePlayingStateChanged, MissionItemExecuted,)
+from olympe.enums.common.MavlinkState import MavlinkFilePlayingStateChanged_State
 
-    """
-    def __init__(self, hidrone:HiDrone, waypoints:List):
+class MavlinkThread(threading.Thread):
+    """Thread (queue) for transfering mavlink flightplan to drone"""
+
+    def __init__(self, drone: HiDrone, cmd_deque):
+        self.drone = drone
+        self.rate = 10
+        self.cmd_deque = cmd_deque
+
+        # restAPI related
+        self.headers = {
+            "Accept": "application/json, text/javascript, text/plain */*; q=0.01",
+            "X-Requested-With": "XMLHttpRequest",
+            "Content-type": "application/json; charset=UTF-8; application/gzip",
+        }
+        # must be called for thread to work
         super().__init__()
-        self.waypoints = waypoints
-        self.hidrone = hidrone
 
     def run(self):
-        """
-        Do not invoke this function directly
+        self.prev_time = time.time()
+        while True:
+            # get cmd
+            print("length of cmd deque: {}".format(len(self.cmd_deque)))
+            if len(self.cmd_deque)>0:
+                with lock: 
+                    cmd_data = self.cmd_deque.popleft()
+                    num_of_cmds = len(cmd_data)
+                # keep trying to upload mavlink file/string until success
+                while self.drone.drone.get_state(FlyingStateChanged)["state"] is not FlyingStateChanged_State.takingoff:
+                    print("Sending")
+                    resp = requests.put(
+                        url=os.path.join("http://", self.drone.drone_ip, "api/v1/upload", "flightplan"),
+                        headers=self.headers,
+                        data=BytesIO(cmd_data.as_text().encode("utf-8")),
+                    )
 
-        """
-        print("performing waypoint following")
-        for wp in self.waypoints:
-            # self.hidrone.drone(moveTo(wp[0], wp[1], wp[2], MoveToChanged_Orientation_mode.NONE, 0.0))
-            # hacky way to do this
-            # blah += "moveTo({}, {}, {}, MoveToChanged_Orientation_mode.NONE, 0.0, _no_expect=True) >> FlyingStateChanged(state='flying', _timeout=5,  _no_expect=True) >> FlyingStateChanged(state='hovering', _timeout=5,  _no_expect=True) >> ".format(wp[0], wp[1], wp[2])
-            self.hidrone.moveto(wp[0], wp[1], wp[2])   
+                    # now execute the flightplan
+                    expectation = Start(resp.json(), type="flightPlan")
+                    for i in range(num_of_cmds):
+                        expectation = expectation >> MissionItemExecuted(idx=i)
+
+                    expectation = expectation >> MavlinkFilePlayingStateChanged(state="stopped")
+
+                    # wait doesn't unblock for some reason
+                    # self.drone.drone(expectation).wait()
+                    self.drone.drone(expectation)
+                    time.sleep(0.25)
+                
+                # block until mavlinkfileplyaingstatechanged
+                while self.drone.drone.get_state(MavlinkFilePlayingStateChanged)['state'] is not MavlinkFilePlayingStateChanged_State.stopped:
+                    time.sleep(1)
+                print("Done")
+
+            # control loop rate
+            time_now = time.time()
+            dt = time_now - self.prev_time
+            if 1/self.rate - dt >0:
+                time.sleep(1/self.rate - dt)
+
+            self.prev_time = time_now
 
     # def pcmd_moveto(self, lat:float, lon:float, alt):
 
