@@ -14,6 +14,7 @@ from olympe.enums.ardrone3.PilotingState import FlyingStateChanged_State
 
 
 drone_ip = "10.202.0.1"
+drone2_ip = "10.202.1.1"
 my_mission = automission("copter")
 # Take off command is ignored! wtf
 # # Taking a picture
@@ -49,12 +50,16 @@ my_mission.land()
 
 # create helper class
 hdrone = HiDrone(drone_ip, "Drone_1")
+hdrone2 = HiDrone(drone2_ip, "Drone_2")
 
 # setup threads
 hdrone.setup()
+hdrone2.setup()
 
 # try sending our command
 hdrone.send_flightplan(my_mission)
+time.sleep(10)
+hdrone2.send_flightplan(my_mission)
 
 # main thread loop
 start_time = time.time()
@@ -65,5 +70,9 @@ while time.time() - start_time < 2000:
     time.sleep(1)
     if hdrone.drone.get_state(FlyingStateChanged)["state"] is FlyingStateChanged_State.landed:
         # delay sending another flight plan
-        print("sending flight plan")
+        print("sending flight plan to first drone")
         hdrone.send_flightplan(my_mission)
+    if hdrone2.drone.get_state(FlyingStateChanged)["state"] is FlyingStateChanged_State.landed:
+        # delay sending another flight plan
+        print("sending flight plan to second drone")
+        hdrone2.send_flightplan(my_mission)
