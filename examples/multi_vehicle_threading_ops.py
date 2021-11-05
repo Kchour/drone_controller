@@ -1,6 +1,7 @@
 """Try multithreading command send and state feedback
 
-To download photos/videos goto: http://10.202.0.1/#/
+To download photos/videos for drone1 goto: http://10.202.0.1/#/
+To download photos/videos for drone2 goto: http://10.202.1.1/#/
 
 NOTE: the ip address will change depending on whether drone is simulated or real!
 
@@ -8,9 +9,11 @@ NOTE: the ip address will change depending on whether drone is simulated or real
 import time
 
 from numpy.lib.histograms import histogram
-from drone_controller import automission, HiDrone
+from drone_controller import automission, HiDrone, VideoStreamShow
 from olympe.messages.ardrone3.PilotingState import FlyingStateChanged
 from olympe.enums.ardrone3.PilotingState import FlyingStateChanged_State
+
+
 
 
 drone_ip = "10.202.0.1"
@@ -55,6 +58,16 @@ hdrone2 = HiDrone(drone2_ip, "Drone_2")
 # setup threads
 hdrone.setup()
 hdrone2.setup()
+
+# try setting up live video feed
+vss = VideoStreamShow()
+vss.setup_drone(hdrone)
+vss.start_stream(hdrone)
+
+# try setting up live video feed
+vss.setup_drone(hdrone2)
+vss.start_stream(hdrone2)
+
 
 # try sending our command
 hdrone.send_flightplan(my_mission)
