@@ -85,8 +85,11 @@ class automission(object):
 		self.mlist.append('QGC WPL 120\n')
 		# self.mlist.append('0	1	0	0	0	0	0	0	0	0	0	1\n')
 		
-		# increment counter for index
+		# increment counter for mavlink index
 		self.counter=0
+
+		# camera roi index
+		self.roi_counter = -1
 
 	def write(self,name='test.mavlink'): 		
 		# saves final command list mlist as txt file. 
@@ -107,6 +110,8 @@ class automission(object):
 	def __len__(self):
 		return self.counter + 1
 
+	def get_roi_ind(self):
+		return self.roi_counter
 
 	################################################################################
 	
@@ -253,6 +258,38 @@ class automission(object):
 		self.mlist.append(msg)
 		self.counter += 1	
 
+	def set_cam_roi(self, lat, lon, alt):
+		"""Set front camera region of interest
+		
+		params:
+		1) mode (default is 3 I believe?). 
+		
+		5: lat
+		6: lon
+		7: alt
+
+		all else is ignored
+
+		"""
+		msg = MavlinkMsg(INDEX=self.counter, CURRENT_WP=0, COORD_FRAME=3, COMMAND=Cmd.MAV_CMD_DO_SET_ROI.value,
+					PARAM1=3, PARAM2=0, PARAM3=0, PARAM4=0, PARAM5=lat, PARAM6=lon, PARAM7=alt)
+		self.mlist.append(msg)
+		self.counter += 1	
+		self.roi_counter +=1
+	
+	def set_view_mode(self, mode:MAVViewModeType, roi_index: int):
+		"""Set view mode. parrot specific command
+
+		1) view mode type (must be from MAV_VIEW_MODE_TYPE)
+		2) ROI index if view mode type is VIEW_MODE_TYPE_ROI. If ROI does not exist, View Mode is set to Absolute
+
+		all other params ignored
+
+		"""
+		msg = MavlinkMsg(INDEX=self.counter, CURRENT_WP=0, COORD_FRAME=3, COMMAND=Cmd.MAV_CMD_SET_VIEW_MODE.value,
+					PARAM1=mode, PARAM2=roi_index, PARAM3=0, PARAM4=0, PARAM5=0, PARAM6=0, PARAM7=0)
+		self.mlist.append(msg)
+		self.counter += 1	
 	
 	##############################################################################################################
 	# Below has not been tested yet
