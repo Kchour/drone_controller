@@ -53,8 +53,9 @@ hdrone = HiDrone(drone_ip, "Drone_1")
 # setup threads
 hdrone.setup()
 
-# try sending our command
-hdrone.send_flightplan(my_mission)
+# try setting and starting flight plan
+hdrone.set_flightplan(my_mission)
+hdrone.start_flightplan()
 
 # main thread loop
 start_time = time.time()
@@ -65,5 +66,5 @@ while time.time() - start_time < 2000:
     time.sleep(1)
     if hdrone.drone.get_state(FlyingStateChanged)["state"] is FlyingStateChanged_State.landed:
         # delay sending another flight plan
-        print("sending flight plan")
-        hdrone.send_flightplan(my_mission)
+        print("start flight plan")
+        hdrone.start_flightplan()

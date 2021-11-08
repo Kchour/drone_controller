@@ -8,7 +8,11 @@ from olympe.messages.ardrone3.PilotingState import FlyingStateChanged,\
                                      PositionChanged, SpeedChanged, AttitudeChanged, AirSpeedChanged
 from olympe.messages.ardrone3.GPSSettingsState import GPSFixStateChanged, HomeChanged
 from olympe.enums.ardrone3.PilotingState import MoveToChanged_Orientation_mode, FlyingStateChanged_State
-
+from olympe.messages.common.Mavlink import Start, Stop, Pause
+from olympe.messages.common.MavlinkState import (
+    MavlinkFilePlayingStateChanged,
+    MissionItemExecuted,
+)
 # Limit the verbosity of log
 olympe.log.update_config({"loggers": {"olympe": {"level": "INFO"}}})
 
@@ -109,7 +113,15 @@ class HiDrone:
         self.state_thread = StateThread(self, state_deque=self.state_deque, path=path)
 
         self.cmd_deque = deque()
-        self.cmd_thread = MavlinkThread(self, self.cmd_deque)
+        self.cmd_thread = MavlinkThread(self)
+
+        # REST API
+        self.headers = {
+            "Accept": "application/json, text/javascript, text/plain */*; q=0.01",
+            "X-Requested-With": "XMLHttpRequest",
+            "Content-type": "application/json; charset=UTF-8; application/gzip",
+        }
+
 
     def set_func(self, func, *args, **kwargs):
         """
@@ -204,9 +216,9 @@ class HiDrone:
             posDict = self.drone.get_state(PositionChanged)
             lat, lon, alt = posDict["latitude"], posDict["longitude"], posDict["altitude"]
 
-            print("Latitude:", lat) 
-            print("Longitude:", lon) 
-            print("Altitude:", alt) 
+            # print("Latitude:", lat) 
+            # print("Longitude:", lon) 
+            # print("Altitude:", alt) 
         except:
             posDict = {"latitude": -1, "longitude":-1, "altitude": -1}
 
@@ -220,7 +232,7 @@ class HiDrone:
         speedDict = self.drone.get_state(SpeedChanged)
 
         airspeed = np.linalg.norm([speedDict["speedX"], speedDict["speedY"], speedDict["speedZ"] ])
-        print("airspeed: {}".format(airspeed))
+        # print("airspeed: {}".format(airspeed))
 
         return airspeed
 
@@ -231,9 +243,9 @@ class HiDrone:
         """
         speedDict = self.drone.get_state(SpeedChanged)
 
-        print("speedx:", speedDict["speedX"])
-        print("speedy:", speedDict["speedY"])
-        print("speedz:", speedDict["speedZ"])
+        # print("speedx:", speedDict["speedX"])
+        # print("speedy:", speedDict["speedY"])
+        # print("speedz:", speedDict["speedZ"])
 
         return speedDict
 
@@ -241,9 +253,9 @@ class HiDrone:
 
         attDict = self.drone.get_state(AttitudeChanged)
 
-        print("roll:", attDict["roll"])
-        print("pitch:", attDict["pitch"])
-        print("yaw:", attDict["yaw"])   
+        # print("roll:", attDict["roll"])
+        # print("pitch:", attDict["pitch"])
+        # print("yaw:", attDict["yaw"])   
 
         return attDict
 
@@ -269,19 +281,68 @@ class HiDrone:
         """set up threads"""
         # first wait for GPS STATE CHANGED
         # while not self.drone.get_state(GPSFixStateChanged)[]
-        while self.drone.get_state(FlyingStateChanged)['state'] is not FlyingStateChanged_State.landed:
-            pass
+        # while self.drone.get_state(FlyingStateChanged)['state'] is not FlyingStateChanged_State.landed:
+        #     pass
         print("Drone {} @ {} STARTING COMMAND THREAD".format(self.name, self.drone_ip))
         self.cmd_thread.start()
         print("Drone {} @ {} STARTING STATE-RECORDING THREAD".format(self.name, self.drone_ip))
         self.state_thread.start()
 
-    def send_flightplan(self, cmd: automission):
-        # only allow one flight plan in queue
-        if len(self.cmd_deque) == 0:
-            with lock:
-                self.cmd_deque.append(cmd)
-                print("main thread deque {}".format(len(self.cmd_deque)))
+    def set_flightplan(self, flight_plan: automission=None):
+        """Whatever is last sent will be played next"""
+        print("setting flight plan to drone {}".format(self.name))
+        with lock:
+            item = ("set", flight_plan)
+            self.cmd_deque.append(item)
+
+    # def start_flightplan(self, flight_plan: automission=None):
+    #     # reuse previous flight plan if a new one is not specified
+    #     if flight_plan is not None:
+    #         self.flight_plan = flight_plan
+    #     # only allow one flight plan in queue
+    #     if len(self.cmd_deque) == 0:
+    #         with lock:
+    #             self.cmd_deque.append(self.flight_plan)
+    #             print("main thread deque {}".format(len(self.cmd_deque)))
+
+    def start_flightplan(self):
+        """Nonblocking function to start flight plan
+
+        """
+        print("start flight plan to drone {}".format(self.name))
+        with lock:
+            item = ("start", "")
+            self.cmd_deque.append(item)
+
+
+        # resp = requests.put(
+        #     url=os.path.join("http://", self.drone_ip, "api/v1/upload", "flightplan"),
+        #     headers=self.headers,
+        #     data=BytesIO(flight_plan.as_text().encode("utf-8")),
+        # )
+        # if self.resp is not None:
+        #     # if not playing keep trying!
+        #     while self.drone.get_state(MavlinkFilePlayingStateChanged)["state"] is not \
+        #         MavlinkFilePlayingStateChanged_State.playing:
+        #         self.drone(Start(self.resp.json(), type="flightPlan"))
+
+    def pause_flightplan(self):
+        # """Pause flight plan at current mission item"""
+        # while self.drone.get_state(MavlinkFilePlayingStateChanged)["state"] is not \
+        #     MavlinkFilePlayingStateChanged_State.paused:
+        #     self.drone(Pause())
+        print("pausing flight plan to drone {}".format(self.name))
+        with lock:
+            item = ("pause", "")
+            self.cmd_deque.append(item)
+
+
+    def cancel_flightplan(self):
+        """Flight plan has been stopped. AV will start over"""
+        print("stopping flight plan to drone {}".format(self.name))
+        with lock:
+            item = ("stop", "")
+            self.cmd_deque.append(item)
 
 class StateThread(threading.Thread):
     """Thread just for reporting vehicle state"""
@@ -362,10 +423,11 @@ from olympe.enums.common.MavlinkState import MavlinkFilePlayingStateChanged_Stat
 class MavlinkThread(threading.Thread):
     """Thread (queue) for transfering mavlink flightplan to drone"""
 
-    def __init__(self, drone: HiDrone, cmd_deque):
+    def __init__(self, drone: HiDrone):
         self.drone = drone
-        self.rate = 10
-        self.cmd_deque = cmd_deque
+        self.rate = 25
+        self.cmd_deque = drone.cmd_deque
+        self.mission = None
 
         # restAPI related
         self.headers = {
@@ -383,32 +445,55 @@ class MavlinkThread(threading.Thread):
             if len(self.cmd_deque)>0:
                 with lock: 
                     cmd_data = self.cmd_deque.popleft()
-                    num_of_cmds = len(cmd_data)
-                # keep trying to upload mavlink file/string until success
-                while self.drone.drone.get_state(FlyingStateChanged)["state"] is not FlyingStateChanged_State.takingoff:
-                    print("Sending")
-                    resp = requests.put(
+                    # cmd_data = (cmd: str, info: automission)
+                # either to send, start, pause, or stop a flight!
+                cmd, mission = cmd_data
+                if cmd == "set":
+                    self.mission = mission
+                elif cmd == "start":
+                    # keep trying to start mission until success
+                    while self.drone.drone.get_state(MavlinkFilePlayingStateChanged)["state"] is not \
+                        MavlinkFilePlayingStateChanged_State.playing:
+                        # print("Starting drone {}".format(self.drone.name))
+                        self.resp = requests.put(
                         url=os.path.join("http://", self.drone.drone_ip, "api/v1/upload", "flightplan"),
-                        headers=self.headers,
-                        data=BytesIO(cmd_data.as_text().encode("utf-8")),
-                    )
-
-                    # now execute the flightplan
-                    expectation = Start(resp.json(), type="flightPlan")
-                    for i in range(num_of_cmds):
-                        expectation = expectation >> MissionItemExecuted(idx=i)
-
-                    expectation = expectation >> MavlinkFilePlayingStateChanged(state="stopped")
-
-                    # wait doesn't unblock for some reason
-                    # self.drone.drone(expectation).wait()
-                    self.drone.drone(expectation)
-                    time.sleep(0.25)
+                        headers=self.drone.headers,
+                        data=BytesIO(self.mission.as_text().encode("utf-8")),
+                        )       
+                        self.drone.drone(Start(self.resp.json(), type="flightPlan")>> MavlinkFilePlayingStateChanged(state="playing"))
+                        # need to limit this inner loop rate, else drone queueing system crashes
+                        time.sleep(0.25)
+                elif cmd == "pause":
+                    # print("pausing")
+                    while self.drone.drone.get_state(MavlinkFilePlayingStateChanged)["state"] is not \
+                        MavlinkFilePlayingStateChanged_State.paused:
+                        self.drone.drone(Pause())
+                        time.sleep(0.25)
+                elif cmd == "stop":
+                    # print("stopping")
+                    while self.drone.drone.get_state(MavlinkFilePlayingStateChanged)["state"] is not \
+                        MavlinkFilePlayingStateChanged_State.stopped:
+                        self.drone.drone(Stop())
+                        time.sleep(0.25)
                 
-                # block until mavlinkfileplyaingstatechanged
-                while self.drone.drone.get_state(MavlinkFilePlayingStateChanged)['state'] is not MavlinkFilePlayingStateChanged_State.stopped:
-                    time.sleep(1)
-                print("Done")
+                # keep trying to start mission until success
+                # while self.drone.drone.get_state(FlyingStateChanged)["state"] is not FlyingStateChanged_State.takingoff:
+                #     # # now execute the flightplan
+                #     # expectation = Start(self.drone.resp.json(), type="flightPlan")
+                #     # for i in range(num_of_cmds):
+                #     #     expectation = expectation >> MissionItemExecuted(idx=i)
+
+                #     # expectation = expectation >> MavlinkFilePlayingStateChanged(state="stopped")
+
+                #     # # wait doesn't unblock for some reason
+                #     # # self.drone.drone(expectation).wait()
+                #     # self.drone.drone(expectation)
+                #     # time.sleep(0.25)
+                
+                # # block until mavlinkfileplyaingstatechanged
+                # while self.drone.drone.get_state(MavlinkFilePlayingStateChanged)['state'] is not MavlinkFilePlayingStateChanged_State.stopped:
+                #     time.sleep(1)
+                # print("Done")
 
             # control loop rate
             time_now = time.time()

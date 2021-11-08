@@ -59,8 +59,10 @@ hdrone2 = HiDrone(drone2_ip, "Drone_2")
 hdrone.setup()
 hdrone2.setup()
 
-# try setting up live video feed
+# live video stream
 vss = VideoStreamShow()
+
+# try setting up live video feed
 vss.setup_drone(hdrone)
 vss.start_stream(hdrone)
 
@@ -69,10 +71,12 @@ vss.setup_drone(hdrone2)
 vss.start_stream(hdrone2)
 
 
-# try sending our command
-hdrone.send_flightplan(my_mission)
-time.sleep(10)
-hdrone2.send_flightplan(my_mission)
+# try sending our command, then start!
+hdrone.set_flightplan(my_mission)
+hdrone.start_flightplan()
+time.sleep(35)
+hdrone2.set_flightplan(my_mission)
+hdrone2.start_flightplan()
 
 # main thread loop
 start_time = time.time()
@@ -82,10 +86,16 @@ while time.time() - start_time < 2000:
     i += 1
     time.sleep(1)
     if hdrone.drone.get_state(FlyingStateChanged)["state"] is FlyingStateChanged_State.landed:
-        # delay sending another flight plan
-        print("sending flight plan to first drone")
-        hdrone.send_flightplan(my_mission)
+        # fly previous flight plan
+        hdrone.start_flightplan()
     if hdrone2.drone.get_state(FlyingStateChanged)["state"] is FlyingStateChanged_State.landed:
-        # delay sending another flight plan
-        print("sending flight plan to second drone")
-        hdrone2.send_flightplan(my_mission)
+        # fly previous flight  plan
+        hdrone2.start_flightplan()
+
+    # try pausing the
+    if 15<= time.time() - start_time < 16:
+        hdrone.pause_flightplan()
+
+    # try resuming
+    if 21 <= time.time() - start_time < 22:
+        hdrone.start_flightplan()

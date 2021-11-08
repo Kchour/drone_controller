@@ -6,20 +6,19 @@ https://forum.developer.parrot.com/t/olympe-mavlink-working-example/14041/2
 
 # for a more complicated example, see `threading_ops`
 """
-
 import olympe
-from olympe.messages.common.Mavlink import Start
+from olympe.messages.common.Mavlink import Start, Stop, Pause
 from olympe.messages.common.MavlinkState import (
     MavlinkFilePlayingStateChanged,
     MissionItemExecuted,
 )
+olympe.log.update_config({"loggers": {"olympe": {"level": "WARNING"}}})
 
-from drone_controller import automission
+import time
 import requests
 import os
 
-olympe.log.update_config({"loggers": {"olympe": {"level": "INFO"}}})
-
+from drone_controller import automission
 
 drone_ip = "10.202.0.1"
 
@@ -65,11 +64,39 @@ resp = requests.put(
 #     >> MavlinkFilePlayingStateChanged(state="stopped")
 # ).wait(_timeout=200)
 
+t1 = time.time()
+print("{}: STARTING FLIGHT PLAN".format(time.time()-t1))
 # this is equivalent to above, but allows for better programming
+# Add .wait() at the end to block until completion
 expectation = Start(resp.json(), type="flightPlan")
+# MissionItemExecuted seems optional
 for i in range(4):
     expectation = expectation >> MissionItemExecuted(idx=i)
 expectation = expectation >> MavlinkFilePlayingStateChanged(state="stopped")
-drone(expectation).wait()
+drone(expectation)
+time.sleep(5)
+
+# Try pausing the flight plan after 5 seconds
+print("{}: PAUSING FLIGHT PLAN".format(time.time()-t1))
+expectation = Stop()
+expectation = expectation >> MavlinkFilePlayingStateChanged(state="paused")
+drone(expectation)
+
+time.sleep(5)
+
+# After another 5 seconds, unpause flight plan
+print("{}: RESUME FLIGHT PLAN".format(time.time()-t1))
+expectation = Start(resp.json(), type="flightPlan")
+drone(expectation)
+
+time.sleep(5)
+
+# after 5 seconds, try to cancel the flight plan
+print("{}: CANCEL FLIGHT PLAN".format(time.time()-t1))
+expectation = Stop()
+drone(expectation)
+
+# let's just wait for 2 minutes
+time.sleep(120)
 
 assert expectation
