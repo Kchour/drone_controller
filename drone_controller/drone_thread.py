@@ -2,6 +2,7 @@
 Simpler API for interacting with our drones
 
 """
+
 import olympe
 from olympe.messages.ardrone3.Piloting import TakeOff, Landing, moveBy, moveTo
 from olympe.messages.ardrone3.PilotingState import FlyingStateChanged,\
@@ -16,6 +17,8 @@ from olympe.messages.common.MavlinkState import (
 # Limit the verbosity of log
 olympe.log.update_config({"loggers": {"olympe": {"level": "INFO"}}})
 
+import math
+import atexit
 from io import BytesIO
 import threading
 from threading import Lock
@@ -33,7 +36,15 @@ from .flight_plan import automission
 
 lock = Lock()
 
-
+# signal for threads to stop
+signal_to_threads = threading.Event()
+# register threads
+registered_threads = []
+@atexit.register
+def signal_threads():
+    signal_to_threads.set()
+    for thread in registered_threads:
+        thread.signal.wait()
 
 class ThreadHandler(threading.Thread):
 
@@ -107,7 +118,9 @@ class HiDrone:
 
         # init thread objects
         home = expanduser("~")
-        path = os.path.join(home, ".drone_data_recordings", self.name+".csv")
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        path = os.path.join(home, ".drone_data_recordings", timestr+"_"+self.name+".csv")
+        # path = os.path.join(home, ".drone_data_recordings", self.name+".csv")
 
         self.state_deque = deque()
         self.state_thread = StateThread(self, state_deque=self.state_deque, path=path)
@@ -219,7 +232,7 @@ class HiDrone:
             # print("Latitude:", lat) 
             # print("Longitude:", lon) 
             # print("Altitude:", alt) 
-        except:
+        except RuntimeError:
             posDict = {"latitude": -1, "longitude":-1, "altitude": -1}
 
         return posDict
@@ -229,10 +242,15 @@ class HiDrone:
         Get drone speed in drone's referential. AirSpeedChanged isn't supported :[
 
         """
-        speedDict = self.drone.get_state(SpeedChanged)
+        try:
+            speedDict = self.drone.get_state(SpeedChanged)
 
-        airspeed = np.linalg.norm([speedDict["speedX"], speedDict["speedY"], speedDict["speedZ"] ])
-        # print("airspeed: {}".format(airspeed))
+            # airspeed = np.linalg.norm([speedDict["speedX"], speedDict["speedY"], speedDict["speedZ"] ])
+            airspeed = math.sqrt(speedDict["speedX"]**2 + speedDict["speedY"]**2 + speedDict["speedZ"]**2 )
+            # print("airspeed: {}".format(airspeed))
+        except RuntimeError:
+            #RuntimeError: ardrone3.PilotingState.SpeedChanged state is uninitialized 
+            airspeed = 500
 
         return airspeed
 
@@ -241,7 +259,11 @@ class HiDrone:
         Get drone speed in NED referential (North-East-Down)
         
         """
-        speedDict = self.drone.get_state(SpeedChanged)
+        try:
+            speedDict = self.drone.get_state(SpeedChanged)
+        except RuntimeError:
+            # when ardrone3.PilotingState.SpeedChanged state is uninitialized
+            speedDict = {"speedX": 500, "speedY": 500, "speedZ": 500}
 
         # print("speedx:", speedDict["speedX"])
         # print("speedy:", speedDict["speedY"])
@@ -251,7 +273,10 @@ class HiDrone:
 
     def get_attitude(self):
 
-        attDict = self.drone.get_state(AttitudeChanged)
+        try:
+            attDict = self.drone.get_state(AttitudeChanged)
+        except RuntimeError:
+            attDict = {"roll": 500, "pitch": 500, "yaw": 500}
 
         # print("roll:", attDict["roll"])
         # print("pitch:", attDict["pitch"])
@@ -352,8 +377,13 @@ class StateThread(threading.Thread):
         self.state_queue = state_deque
         self.rate = 1
 
+        # register thread
+        registered_threads.append(self)
+        self.signal = threading.Event()
+
         self.path = self.unique_name(path)
         super().__init__()
+        self.daemon = True
 
     def unique_name(self, path):
         filename, extension = os.path.splitext(path)
@@ -371,9 +401,9 @@ class StateThread(threading.Thread):
                 # guard against raise condition
                 raise
             
-            # write a blank file there
-            with open(path, 'w') as f:
-                f.write("")
+        # write a blank file there
+        with open(path, 'w') as f:
+            f.write("")
 
         return path
 
@@ -385,34 +415,44 @@ class StateThread(threading.Thread):
             # Add titles
             file.write("time, vgx, vgy, vgz, vb, lat, lon, alt, roll, pitch, yaw\n")
             while True:
-                if self.drone.drone.get_state(FlyingStateChanged)["state"] is not FlyingStateChanged_State.landing or \
-                    self.drone.drone.get_state(FlyingStateChanged)["state"] is not FlyingStateChanged_State.landed:
+                # if self.drone.drone.get_state(FlyingStateChanged)["state"] is not FlyingStateChanged_State.landing or \
+                #     self.drone.drone.get_state(FlyingStateChanged)["state"] is not FlyingStateChanged_State.landed:
 
-                    # make time series
+                # make time series
 
-                    # get time
-                    # get global frame speed
-                    # get body frame speed
-                    # get pose (lat/lon/alt)
-                    # get attitude
-                    vgx, vgy, vgz = self.drone.get_global_speed().values()
-                    vb = self.drone.get_air_speed()
-                    lat, lon, alt = self.drone.get_pos().values()
-                    r, p, y = self.drone.get_attitude().values()
+                # get time
+                # get global frame speed
+                # get body frame speed
+                # get pose (lat/lon/alt)
+                # get attitude
+                vgx, vgy, vgz = self.drone.get_global_speed().values()
+                vb = self.drone.get_air_speed()
+                lat, lon, alt = self.drone.get_pos().values()
+                r, p, y = self.drone.get_attitude().values()
 
-                    # time, vgx, vgy, vgz, vb, lat, lon, alt, roll, pitch, yaw
-                    data = "{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}\n".format(time.time()-start, vgx, vgy, vgz, vb, lat, lon, alt, r, p, y)
+                # time, vgx, vgy, vgz, vb, lat, lon, alt, roll, pitch, yaw
+                data = "{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}\n".format(time.time()-start, vgx, vgy, vgz, vb, lat, lon, alt, r, p, y)
+                # write to file
+                file.write(data)
+                # print(data)
 
-                    # write to file
-                    file.write(data)
+                if signal_to_threads.is_set():
+                    # break out of while loop to exit with context
+                    # TODO perform clean up
+                    # tell current thread to stop
+                    self.signal.set()
+                    break
 
-                    # control loop rate
-                    time_now = time.time()
-                    dt = time_now - self.prev_time
-                    if 1/self.rate - dt >0:
-                        time.sleep(1/self.rate - dt)
+                # control loop rate
+                dt = time.time() - self.prev_time
+                if 1/self.rate - dt >=0:
+                    time.sleep(1/self.rate - dt)
+                self.prev_time = time.time()
+                # else:
+                #     self.prev_time = time_now
 
-                    self.prev_time = time_now
+
+
 
     
 from olympe.messages.common.Mavlink import Start
@@ -435,8 +475,13 @@ class MavlinkThread(threading.Thread):
             "X-Requested-With": "XMLHttpRequest",
             "Content-type": "application/json; charset=UTF-8; application/gzip",
         }
+        
+        registered_threads.append(self)
+        self.signal = threading.Event()
+
         # must be called for thread to work
         super().__init__()
+        self.daemon = True
 
     def run(self):
         self.prev_time = time.time()
@@ -496,12 +541,18 @@ class MavlinkThread(threading.Thread):
                 # print("Done")
 
             # control loop rate
-            time_now = time.time()
-            dt = time_now - self.prev_time
+            dt = time.time() - self.prev_time
             if 1/self.rate - dt >0:
                 time.sleep(1/self.rate - dt)
+            self.prev_time = time.time() 
 
-            self.prev_time = time_now
+            if signal_to_threads.is_set():
+                # TODO: do clean up
+                self.signal.set()
+                # break out of while loop to exit with context
+                break
+        
+        # outside of the loop, so stop thread
 
     # def pcmd_moveto(self, lat:float, lon:float, alt):
 

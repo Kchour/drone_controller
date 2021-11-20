@@ -42,7 +42,10 @@ drone.connect()
 # try sending string 
 my_mission = automission("copter")
 # Take off command is ignored!
+# try adding 10 second delay
 my_mission.takeoff()
+# my_mission.delay(5)                          # this doesn't seem to work 
+my_mission.waypoint(48.878922, 2.367782, 5)    # this is the starting gps point
 my_mission.waypoint(48.879000, 2.366549, 100.0)
 my_mission.waypoint(48.879139, 2.367296, 10.0)
 my_mission.land()
@@ -69,14 +72,16 @@ print("{}: STARTING FLIGHT PLAN".format(time.time()-t1))
 # this is equivalent to above, but allows for better programming
 # Add .wait() at the end to block until completion
 expectation = Start(resp.json(), type="flightPlan")
-# MissionItemExecuted seems optional
-for i in range(4):
-    expectation = expectation >> MissionItemExecuted(idx=i)
-expectation = expectation >> MavlinkFilePlayingStateChanged(state="stopped")
-drone(expectation)
-time.sleep(5)
+# # MissionItemExecuted seems optional
+# for i in range(5):
+#     expectation = expectation >> MissionItemExecuted(idx=i)
+# expectation = expectation >> MavlinkFilePlayingStateChanged(state="stopped")
+expectation = expectation >> MavlinkFilePlayingStateChanged(state="playing")
+drone(expectation).wait()
+print("test")
+time.sleep(60)
 
-# Try pausing the flight plan after 5 seconds
+# Try pausing the flight plan after 60 seconds
 print("{}: PAUSING FLIGHT PLAN".format(time.time()-t1))
 expectation = Stop()
 expectation = expectation >> MavlinkFilePlayingStateChanged(state="paused")

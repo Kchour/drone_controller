@@ -199,15 +199,11 @@ class automission(object):
 	def delay(self, delay: float):
 		"""Delay the next navigation commands. Same as MAV_CMD_CONDITION_DELAY.
 
-		Whenever a delay is added, the previous waypoint will be of type Stop. 
-		A delay = 0 will wait for all actions to be completed before moving on to the next waypoint. 
-		If a delay > 0 is requested, the drone will continue as soon as the given delay has expired.
-		
 		Params
 		delay in seconds
 
 		"""
-		msg = MavlinkMsg(INDEX=self.counter, CURRENT_WP=0, COORD_FRAME=3, COMMAND=Cmd.MAV_CMD_NAV_DELAY.value,
+		msg = MavlinkMsg(INDEX=self.counter, CURRENT_WP=0, COORD_FRAME=2, COMMAND=Cmd.MAV_CMD_NAV_DELAY.value,
 					PARAM1=delay, PARAM2=0, PARAM3=0, PARAM4=0, PARAM5=0, PARAM6=0, PARAM7=0)
 
 		self.mlist.append(msg)

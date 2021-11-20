@@ -10,7 +10,8 @@ import time
 from olympe.messages.ardrone3.Piloting import TakeOff, Landing
 
 # This is the default drone IP address over the virtual Ethernet interface
-DRONE_IP = "10.202.0.1"
+# DRONE_IP = "10.202.0.1"       # simulated drone
+DRONE_IP = "192.168.42.1"       # real drone
 
 
 def main():
