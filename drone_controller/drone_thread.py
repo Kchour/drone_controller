@@ -497,17 +497,23 @@ class MavlinkThread(threading.Thread):
                     self.mission = mission
                 elif cmd == "start":
                     # keep trying to start mission until success
-                    while self.drone.drone.get_state(MavlinkFilePlayingStateChanged)["state"] is not \
-                        MavlinkFilePlayingStateChanged_State.playing:
-                        # print("Starting drone {}".format(self.drone.name))
-                        self.resp = requests.put(
-                        url=os.path.join("http://", self.drone.drone_ip, "api/v1/upload", "flightplan"),
-                        headers=self.drone.headers,
-                        data=BytesIO(self.mission.as_text().encode("utf-8")),
-                        )       
-                        self.drone.drone(Start(self.resp.json(), type="flightPlan")>> MavlinkFilePlayingStateChanged(state="playing"))
-                        # need to limit this inner loop rate, else drone queueing system crashes
-                        time.sleep(0.25)
+                    success = False
+                    while not success:
+                        try:
+                            while self.drone.drone.get_state(MavlinkFilePlayingStateChanged)["state"] is not \
+                                MavlinkFilePlayingStateChanged_State.playing:
+                                # print("Starting drone {}".format(self.drone.name))
+                                self.resp = requests.put(
+                                url=os.path.join("http://", self.drone.drone_ip, "api/v1/upload", "flightplan"),
+                                headers=self.drone.headers,
+                                data=BytesIO(self.mission.as_text().encode("utf-8")),
+                                )       
+                                self.drone.drone(Start(self.resp.json(), type="flightPlan")>> MavlinkFilePlayingStateChanged(state="playing"))
+                                # need to limit this inner loop rate, else drone queueing system crashes
+                                time.sleep(0.50)
+                            success = True
+                        except:
+                            pass
                 elif cmd == "pause":
                     # print("pausing")
                     while self.drone.drone.get_state(MavlinkFilePlayingStateChanged)["state"] is not \
